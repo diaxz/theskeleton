@@ -1,23 +1,31 @@
 language: java
 jdk:
 - oraclejdk8
+before_install:
+- docker login --email=$DOCKER_HUB_EMAIL --username=$DOCKER_HUB_USERNAME --password=$DOCKER_HUB_PASSWORD
+- docker build -t theskeleton
+- docker ps -a
 script:
-- mvn clean install sonar:sonar
-after_success:
-- bash <(curl -s https://codecov.io/bash)
+- mvn clean install dockerfile:build dockerfile:push
 before_deploy:
-- openssl aes-256-cbc -K $encrypted_e24db14852c4_key -iv $encrypted_e24db14852c4_iv -in deploy_rsa.enc -out /tmp/deploy_rsa -d
+- openssl aes-256-cbc -K $encrypted_7fcd2402b693_key -iv $encrypted_7fcd2402b693_iv
+  -in deploy_rsa.enc -out /tmp/deploy_rsa -d
 - eval "$(ssh-agent -s)"
 - chmod 600 /tmp/deploy_rsa
 - ssh-add /tmp/deploy_rsa
 deploy:
   provider: script
   skip_cleanup: true
-  script: rsync -r --delete-after --quiet $TRAVIS_BUILD_DIR/target/*.jar theskeleton@azure.ns.codenergic.org:/home/theskeleton/theskeleton-$TRAVIS_BUILD_ID.jar ; ssh theskeleton@azure.ns.codenergic.org 'pkill -f theskeleton' ; ssh theskeleton@azure.ns.codenergic.org 'screen -d -m /home/theskeleton/theskeleton-$TRAVIS_BUILD_ID.jar --logging.file=/home/theskeleton/theskeleton-$TRAVIS_BUILD_ID.log'
+  script: chmod 600 id_rsa && ssh docker@52.187.120.141 '/usr/local/bin/docker-compose
+    down && /usr/local/bin/docker-compose pull && /usr/local/bin/docker-compose up
+    -d'
+  on:
+    branch: master
 addons:
-  sonarcloud:
-    organization: codenergic
-    token:
-      secure: C/bwhQsjwpKg7qaw5ZPvrlsNZ1YCS4HJxvH/VmQmtyskm333Dc6md4ZttcGc68Uepvh6SSBmOp9oGy2Z2tOQzgiyLBgRiC1BJb8KHAHReNiAgCbwldL4tstPZqGUa6bpcap5b5xLEyMN5O2V3D+uuXBGd/QMsC88a5ECeXqh2mz9lWLcACeOPSleT5Hk/SKB51j6Ri4gCIeRhKIlYgTbE54wYyKV/l1dZ+7dcsohfZmTgCSxXnzuNg9LlHFO1/zOUztNtW17P4yH8WwZDVoQfGvOFgxRwRYF90dFdw9a7nVHVseXMZUz/0olu60isbI/HCAarRFzpDORKsMYJpXfGlQQFtJSLzK64STEKGroryLf4JYwwrkL7SUxw434UH7h6JTDhatB0g4v0jhql07316o8HrqcMh614oyXW+ww3IPyyZ3ILNCezb+qJSWeM1w3ettabX4KvbUzdFVQivn2WKuVPpO6oCo2GmRwlcp2RnDv9fnY+rTWN8ukQ2tvhD9rXmGTJ7PydzKEW9Ju56XetcPUJdzLGFrsSG5/TccEtVaqBFKk3i9h5DIXtqRkw6/Ja0I2X8nKgnBWtqW/xOSpmuLcqH2ktfkDGD2oQCPUdwn3Mb2zfmhQOlUrAhegibZNu99lWLW2hEvhoOFJKKjn5dHQtcbElzXTRQ7zCb/kQk0=
   ssh_known_hosts:
-  - azure.ns.codenergic.org
+  - 52.187.120.141
+env:
+  global:
+  - secure: NBd56L2gyvaXcGWxVzeNTvCskfmCVjId4ZAbLHtx/rxEvfmEomYxk9Mc1QD2PUrn9c3jaTpipw1NJICuyQmb3ILCPJla4K0OUmNx0Os0H2yZf/T464by9PpRhm2kOYqSTO1TJDn5x7KG/AsTqi+nzToic3BlsaQ3d4Y0ZfgS6SyMYbaayChaYZuWQX4Ia4Sl1cQB5xJ4q34aOP4SKVGmx1p9J7aG5Q3e/zpb2XaKpKLZGgV7Sq1NoPOH2YJ/CpwMglZOmvOGop3msdvf7lyBFQ04sjF0y3XjGHoPNV0XDpOpwm17PJheE8w03nMLOhgRSlpaGAgnfjYYPrdsgrqzybzseUBVe4sO6bmQ0YTRkhZaNNH0CAFnMm7CznAbw6ApNQxr+74yRHql4w/9kL2I/FzKqhdDx++mA4cWI3Ff7bzOzocVJjywB/TLBjsq09vi8CX2EH1nT4owyLcPFAOqhGwvTLUpfh1Fhf9qeL9/KULKpairv0k+q3xYzVDzbyrsuHi4/b0tgZqujM5IjRa4C0svntSJNeMLYYFqhqVTNhiCp0/vyqBUwh1lasRnWMFMeQBCeI3Q11YKIZG7np0sjHXBLfK5+7HGN8qZiMQV/OhYmv4cvzQWlTjYyYw2hG0oYeAKpr7w3qJyYZIUq/FcLYbNk9dD9wcbk3aMQWARGvY=
+  - secure: vCIEgRboQg8vmPmg0Dxo9UbiPadsf8uV5Y4OPwk2xBUBS8KBNhDO2q4o6q4Bk8Tm+aO43lmUKvofjtxa4Vov6tmMz3MZvIzdIUvWCE3WcnNUh8HYk99LB6u5NiszuRaOLHGKshyKOocp2WAnJYFgbf17h7DmBi6JhbVZXLxg62kWTdCYHUsX42pulb0DiUhJo4sgtzaoYH0yLL/YHXkJiJfRNss3JkcuYKlGWdHfLz7tBHWZEETQa/TtMJogSuUiQj5+36jDFnOtj21ZDx0xGJLyNh038cDnZ0aMWv1D9O2Yk9+gIGjsSIAAj6SrTYTJlG0Zpeu0y6tNtPlJBMqA6x4sPCtZz+p46ceQ5U5BcwS+CEVKgrE2Eqh0NtYy2mFQKAhvzM+DBVJ19Bd4KO4YVOhD8oQrnueBn/aUJc1zN//keGEUG7t+yQPBCgJvbH/+eNv9O7+KXqMyIDx8hHHveCikJaMMYz+lBHnU3xWWrQJxZEEnf14LGrbi7GsTZ1rnMqR356SYkqlTFM5qcqT1MlUKrWvaO+rsRF23IV7mTTzgZDipxSKyIUz99Ht2HSlkhm+u+86OX3jJMkMn7fWH8H4iEcbRlTJ1pMEA/hcZcUgCok1N0/kmPLZ1AI9WaMJd0LplSvs6c7Hw6LJe16IZHFre7wPXUAKodOHjJ6WAszM=
+  - secure: ioN8HeoAZ37d6HyUK50su/sEIwxVjqldYd5r25Sogbxuszk3RH0ob2S2g5SstYkl8RYG0sIedRuQkiu1CLjIFMqHVtc3tXV29P6XDmmgDz7B7YzXZGUw7r5Gv/hNNL/zHKcBEWfFsFqBiK28Dwmama6ECd8RS436iVPa5l3VvkU7TTuAog5XJe+CG+tNZUGX3XAh/30Y9zV41Jp9BHKRm+HPJL9kg7XMrutaSXNwa0T0wIWsbhIJTGW8vt4XIjepukUUXIyxotKES6v86v2YPWd8lFXKjoLGQUzIxntV6gXnD9obWsGNMyOsEfScnvHSP2NYMMyF7EDpsBwzn7T1ERV5x42+DfwnT5Lv4SVNC2bcuFDOIMMQmVkZnbmL1JUX5GtpIBzR2jrv3ZZuFX/F8PWPXKmZa4vetrKCHUASpCOXXzQwApOaC7M1e9wZyF90db65hNhJm8G1b0OuxV5K7uLqah1vltMZwQBV+18aZXwtkNu3CU2WgxQ+d36QgRkYMiqZdukx+ekDXFJGTgbCnCwEfgXaGVLGduKZlBlkyFSZB8ASKmBrzTfumetwZC46Z6rp7+yLnlyKf9vfaQ9vuts/Boq1LL5kysXL7RzOwxUHsTfZ0eChsuQ1FfxpxfCVnkdt3BLKwiXe4F+Lxqslt6G0zKf4/YKiyHFT3OW0ouk=
